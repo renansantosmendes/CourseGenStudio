@@ -1,0 +1,19 @@
+mlflow
+dagshub
+numpy
+python-dotenv
+# Visualization & Utils
+networkx>=2.8.0
+matplotlib>=3.5.0
+seaborn>=0.12.0
+
+# Generative AI (added based on llm.py imports)
+langchain-groq
+langchain-core
+langchain-community
+langchain-openai
+openai
+pydantic
+
+pytest>=7.0.0
+pytest-cov>=4.0.0
