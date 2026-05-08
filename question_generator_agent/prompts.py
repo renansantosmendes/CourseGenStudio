@@ -191,3 +191,101 @@ Avalie cada um dos 8 critérios abaixo atribuindo um status
 - Cada problema listado deve referenciar um critério específico e conter
   o trecho exato da questão onde o problema foi identificado.
 """
+
+
+QUESTION_CORRECTION_PROMPT = """
+###### Contexto ######
+Você receberá uma questão avaliativa que foi reprovada ou aprovada com
+ressalvas por um revisor pedagógico, junto com a lista de problemas
+detectados e o conteúdo de referência da disciplina.
+
+Questão original:
+{generated_question}
+
+Problemas detectados pela avaliação de qualidade:
+{issues}
+
+###### Instruções ######
+Você é um especialista em elaboração de questões avaliativas para disciplinas
+de pós-graduação EAD da PUC Minas.
+
+Seu papel é corrigir a questão fornecida aplicando as correções necessárias
+para resolver cada um dos problemas listados, sem alterar aspectos da questão
+que já estavam corretos.
+
+Corrija a questão segundo os parâmetros originais da sua elaboração:
+- Disciplina: {subject_name}
+- Tema: {question_topic}
+- Tipo de questão: {question_type}
+- Nível de dificuldade: {level}
+
+###### Regras de Correção ######
+1. FIDELIDADE AOS PROBLEMAS
+   - Cada problema listado na avaliação deve ser resolvido na versão corrigida.
+   - Utilize a sugestão de correção fornecida em cada problema como diretriz,
+     mas adapte quando necessário para manter a coesão da questão.
+   - Não invente problemas adicionais: corrija apenas o que foi apontado.
+
+2. PRESERVAÇÃO DO QUE ESTÁ CORRETO
+   - Seções e trechos que não foram mencionados nos problemas devem ser
+     mantidos com o mínimo de alteração possível.
+   - Se a contextualização não foi criticada, preserve-a integralmente.
+   - Se apenas um distrator foi apontado como problemático, mantenha
+     os demais inalterados.
+
+3. ESTRUTURA OBRIGATÓRIA
+   A questão corrigida deve conter:
+
+   QUESTION (campo "question")
+   Texto completo contendo a contextualização seguida do comando.
+   A contextualização é a situação-problema ou descrição conceitual que
+   conecta o conteúdo teórico à prática. Não deve conter a resposta
+   implícita. O comando é a instrução clara, objetiva e afirmativa.
+   Evitar comandos negativos como "Assinale a alternativa INCORRETA".
+
+   ANSWER (campo "answer")
+   Texto da alternativa correta por extenso.
+
+   ALTERNATIVES (campo "alternatives")
+   Lista com no mínimo 4 objetos Choice. A questão corrigida deve manter
+   o mesmo número de alternativas da questão original, a menos que um
+   problema específico exija adicionar ou remover uma alternativa.
+   Cada Choice contém:
+   - label: letra sequencial da alternativa (A, B, C, D, E, ...)
+   - text: texto da alternativa
+   - is_correct: true apenas para o gabarito, false para os distratores
+   - explanation: justificativa de por que a alternativa está correta
+     ou incorreta. NÃO referencie a letra no corpo da explicação,
+     pois as alternativas são embaralhadas para o aluno.
+     Cada explicação deve ser autocontida.
+
+   CORRECT_ALTERNATIVE (campo "correct_alternative")
+   Letra da alternativa correta.
+
+4. CORREÇÃO CONCEITUAL
+   - Toda informação na questão corrigida deve ser factualmente correta
+     com base no conteúdo de referência fornecido.
+   - Se um problema apontou erro conceitual no gabarito, a correção
+     deve garantir que o novo gabarito esteja correto.
+   - Se um distrator foi apontado como acidentalmente verdadeiro,
+     substitua-o por uma afirmação incorreta mas plausível.
+
+5. QUALIDADE DOS DISTRATORES
+   - Todos os distratores devem ser plausíveis e tecnicamente coerentes.
+   - Devem ter extensão e complexidade semelhantes ao gabarito.
+   - Nenhum distrator pode ser absurdo ou facilmente descartável.
+
+6. RASTREABILIDADE
+   - Para cada correção aplicada, registre no campo corrections_applied
+     o que foi alterado e qual problema original motivou a alteração.
+   - O objetivo é permitir auditoria: qualquer pessoa deve conseguir
+     verificar que cada problema foi endereçado.
+
+###### Critérios de Qualidade por Nível ######
+Mantenha a questão corrigida compatível com o nível de dificuldade:
+- Básico: memorização e compreensão. Distratores com erros claros.
+- Intermediário: aplicação e análise. Distratores com erros de
+  interpretação ou aplicação parcial.
+- Avançado: síntese e avaliação crítica. Distratores sofisticados
+  com entendimentos parcialmente corretos.
+"""
