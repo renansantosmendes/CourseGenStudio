@@ -106,39 +106,52 @@ class MultipleChoiceQuestionGeneratorAgent:
             level=level,
         )
 
+    def _route_after_evaluation(self, state: QuestionCreationState) -> str:
+        has_issues = bool(state.get("evaluation") and state["evaluation"].issues)
+        destination = "question_correction" if has_issues else END
+        logger.info("Routing decision — has issues: %s → %s", has_issues, destination)
+        return destination
+
     def _create_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
         logger.info("Node [question_generation] started — topic: '%s', level: '%s'", state["question_topic"], state["level"])
         question_input = self._build_input(
             question_topic=state["question_topic"],
             level=state["level"]
         )
-        logger.info("Node [question_generation] — question input built, invoking generation chain")
         generated_question = self._question_generation_chain.invoke(question_input)
         state["generated_question"] = generated_question
-        logger.info("Node [question_generation] completed — question generated successfully")
+        state["attempts"] = 0
+        logger.info("Node [question_generation] completed — question:\n%s", generated_question.question)
         return state
 
     def _evaluate_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
-        logger.info("Node [question_evaluation] started")
-        logger.info("Node [question_evaluation] — invoking evaluation chain")
+        attempt = state.get("attempts", 0)
+        question = state.get("corrected_question") or state.get("generated_question")
+        logger.info("Node [question_evaluation] started — attempt #%d, evaluating: %s", attempt, "corrected_question" if state.get("corrected_question") else "generated_question")
         evaluation_input = {
-            "generated_question": state["generated_question"],
-            "subject_content": state["subject_content"],
+            "generated_question": question,
+            "subject_name": state["subject_name"],
+            "question_topic": state["question_topic"],
+            "question_type": state["question_type"],
+            "level": state["level"],
         }
         evaluation_result = self._question_evaluation_chain.invoke(evaluation_input)
         state["evaluation"] = evaluation_result
-        logger.info(
-            "Node [question_evaluation] completed — status: '%s', issues found: %d",
-            evaluation_result.global_status,
-            len(evaluation_result.issues),
-        )
+        logger.info("Node [question_evaluation] completed — status: '%s', issues found: %d", evaluation_result.global_status, len(evaluation_result.issues))
+        for criterion in evaluation_result.criteria:
+            logger.info("  Criterion [%s]: %s — %s", criterion.status, criterion.criterion_name, criterion.observation)
+        for issue in evaluation_result.issues:
+            logger.warning("  Issue [%s] %s — %s\n    Excerpt: %s\n    Suggestion: %s", issue.severity, issue.criterion_name, issue.description, issue.problematic_excerpt, issue.suggestion)
         return state
 
     def _correct_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
         issues = state["evaluation"].issues if state["evaluation"] else []
-        logger.info("Node [question_correction] started — addressing %d issue(s)", len(issues))
+        attempt = state.get("attempts", 0) + 1
+        state["attempts"] = attempt
+        question_to_correct = state.get("corrected_question") or state.get("generated_question")
+        logger.info("Node [question_correction] started — attempt #%d, addressing %d issue(s)", attempt, len(issues))
         correction_input = {
-            "generated_question": state["generated_question"],
+            "generated_question": question_to_correct,
             "issues": issues,
             "subject_content": state["subject_content"],
             "subject_name": state["subject_name"],
@@ -148,9 +161,9 @@ class MultipleChoiceQuestionGeneratorAgent:
         }
         corrected_question = self._question_correction_chain.invoke(correction_input)
         state["corrected_question"] = corrected_question
-        logger.info("Node [question_correction] completed — corrected question generated")
+        logger.info("Node [question_correction] completed — corrected question:\n%s", corrected_question.question)
         return state
-        
+
     def _build_graph(self) -> CompiledStateGraph:
         logger.debug("Building agent graph")
         graph = StateGraph(QuestionCreationState)
@@ -162,9 +175,8 @@ class MultipleChoiceQuestionGeneratorAgent:
         graph.add_edge("question_generation", "question_evaluation")
         graph.add_conditional_edges(
             "question_evaluation",
-            lambda state: "question_correction" if (state.get("evaluation") and state["evaluation"].issues) else END,
+            self._route_after_evaluation,
         )
-        graph.add_edge("question_evaluation", "question_correction")
         graph.add_edge("question_correction", "question_evaluation")
 
         graph.set_entry_point("question_generation")
