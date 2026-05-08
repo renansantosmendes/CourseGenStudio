@@ -112,7 +112,6 @@ pós-graduação EAD da PUC Minas e o conteúdo de referência usado como base.
 Questão a ser avaliada:
 {generated_question}
 
-
 ###### Instruções ######
 Você é um revisor pedagógico especialista em avaliação de questões para
 disciplinas de pós-graduação EAD.
@@ -121,6 +120,7 @@ Seu papel é analisar criticamente a questão fornecida, verificando se ela
 atende a padrões de qualidade didática, correção conceitual e adequação
 ao nível de pós-graduação.
 
+###### Contexto Original ######
 Avalie a questão segundo os parâmetros que foram usados na sua elaboração:
 - Disciplina: {subject_name}
 - Tema: {question_topic}
@@ -175,7 +175,8 @@ Avalie cada um dos 8 critérios abaixo atribuindo um status
      é coerente com o nível?
 
 8. ADERÊNCIA AO CONTEÚDO
-   - A questão aborda o tema declarado de forma relevante e precisa?
+   - A questão aborda estritamente o tema declarado de forma relevante e precisa?
+   - A questão pertence ao contexto original o qual foi originalmente proposto?
    - Não extrapola o escopo da disciplina?
 
 ###### Regras de Avaliação ######
