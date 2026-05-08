@@ -103,3 +103,90 @@ Justificativas:
 Retorne a questão completa seguindo exatamente a estrutura e a ordem das
 seções descritas acima. Use texto corrido, sem formatação markdown.
 """
+
+QUESTION_QUALITY_EVALUATION_PROMPT = """
+###### Contexto ######
+Você receberá uma questão avaliativa elaborada para uma disciplina de
+pós-graduação EAD da PUC Minas e o conteúdo de referência usado como base.
+
+Questão a ser avaliada:
+{generated_question}
+
+
+###### Instruções ######
+Você é um revisor pedagógico especialista em avaliação de questões para
+disciplinas de pós-graduação EAD.
+
+Seu papel é analisar criticamente a questão fornecida, verificando se ela
+atende a padrões de qualidade didática, correção conceitual e adequação
+ao nível de pós-graduação.
+
+Avalie a questão segundo os parâmetros que foram usados na sua elaboração:
+- Disciplina: {subject_name}
+- Tema: {question_topic}
+- Tipo de questão: {question_type}
+- Nível de dificuldade: {level}
+
+###### Critérios de Avaliação ######
+Avalie cada um dos 8 critérios abaixo atribuindo um status
+(aprovado, atenção ou reprovado) e uma observação.
+
+1. ESTRUTURA FORMAL
+   - Contém todas as seções obrigatórias: contextualização, comando,
+     alternativas (mínimo de 4 alternativas), gabarito e justificativas?
+   - As seções estão na ordem correta?
+   - Há exatamente uma alternativa correta?
+
+2. CORREÇÃO CONCEITUAL
+   - O gabarito está factualmente correto com base no conteúdo de referência?
+   - Os distratores contêm apenas afirmações incorretas (nenhum distrator
+     é acidentalmente verdadeiro)?
+   - As justificativas explicam corretamente cada alternativa?
+   - Há informação desatualizada ou imprecisa?
+
+3. QUALIDADE DA CONTEXTUALIZAÇÃO
+   - Conecta o conteúdo teórico a uma situação-problema ou cenário relevante?
+   - É autossuficiente (não exige informação externa)?
+   - NÃO entrega a resposta implicitamente?
+   - O texto é coeso e livre de trechos desconexos?
+
+4. QUALIDADE DO COMANDO
+   - É claro, objetivo e autocontido?
+   - Usa linguagem afirmativa (evita "assinale a INCORRETA")?
+   - Está alinhado com a contextualização?
+
+5. QUALIDADE DOS DISTRATORES
+   - São plausíveis e tecnicamente coerentes com o tema?
+   - Nenhum é absurdo ou facilmente descartável?
+   - Têm extensão e complexidade semelhantes ao gabarito?
+   - Representam erros conceituais compatíveis com o nível de dificuldade?
+
+6. QUALIDADE DAS JUSTIFICATIVAS
+   - Cada alternativa possui justificativa individual?
+   - NÃO referenciam a letra da alternativa (A, B, C, D)?
+   - São autocontidas?
+   - A justificativa do gabarito fundamenta a correção?
+   - As justificativas dos distratores explicam o erro e indicam o correto?
+
+7. ADEQUAÇÃO AO NÍVEL DE DIFICULDADE
+   - A questão é compatível com o nível declarado?
+   - Os distratores possuem sofisticação adequada ao nível?
+   - A demanda cognitiva (memorização, aplicação, análise, síntese)
+     é coerente com o nível?
+
+8. ADERÊNCIA AO CONTEÚDO
+   - A questão aborda o tema declarado de forma relevante e precisa?
+   - Não extrapola o escopo da disciplina?
+
+###### Regras de Avaliação ######
+- Se todos os critérios forem aprovados, o status global é "aprovada"
+  e a lista de problemas deve estar vazia.
+- Se houver ao menos um critério com status "atenção" (e nenhum reprovado),
+  o status global é "aprovada com ressalvas".
+- Se houver ao menos um critério com status "reprovado", o status global
+  é "reprovada".
+- Somente gere a questão corrigida se o status global for "aprovada com
+  ressalvas" ou "reprovada".
+- Cada problema listado deve referenciar um critério específico e conter
+  o trecho exato da questão onde o problema foi identificado.
+"""
