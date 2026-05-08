@@ -1,6 +1,9 @@
+import logging
 import os
 import uuid
 from typing import TypedDict
+
+logger = logging.getLogger(__name__)
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
@@ -20,7 +23,7 @@ from question_generator_agent.models import (
     QuestionQualityEvaluation
 )
 
-from state import QuestionCreationState
+from question_generator_agent.state import QuestionCreationState
 
 from dotenv import load_dotenv
 
@@ -77,6 +80,7 @@ class MultipleChoiceQuestionGeneratorAgent:
 
         self._checkpointer = MemorySaver()
         self._thread_id: str = str(uuid.uuid4())
+        logger.info("Initializing MultipleChoiceQuestionGeneratorAgent (generation_model=%s, evaluation_model=%s)", model_for_generation, model_for_evaluation)
         self._graph = self._build_graph()
         self._attempts = 0
         
@@ -101,27 +105,37 @@ class MultipleChoiceQuestionGeneratorAgent:
         )
 
     def _create_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
+        logger.info("Node [question_generation] started — topic: '%s', level: '%s'", state["question_topic"], state["level"])
         question_input = self._build_input(
             question_topic=state["question_topic"],
             level=state["level"]
         )
         generated_question = self._question_generation_chain.invoke(question_input)
         state["generated_question"] = generated_question
+        logger.info("Node [question_generation] completed — question generated successfully")
         return state
-    
+
     def _evaluate_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
+        logger.info("Node [question_evaluation] started")
         evaluation_input = {
             "generated_question": state["generated_question"],
             "subject_content": state["subject_content"],
         }
         evaluation_result = self._question_evaluation_chain.invoke(evaluation_input)
         state["evaluation"] = evaluation_result
+        logger.info(
+            "Node [question_evaluation] completed — status: '%s', issues found: %d",
+            evaluation_result.global_status,
+            len(evaluation_result.issues),
+        )
         return state
-        
+
     def _correct_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
+        issues = state["evaluation"].issues if state["evaluation"] else []
+        logger.info("Node [question_correction] started — addressing %d issue(s)", len(issues))
         correction_input = {
             "generated_question": state["generated_question"],
-            "issues": state["evaluation"].issues if state["evaluation"] else [],
+            "issues": issues,
             "subject_content": state["subject_content"],
             "subject_name": state["subject_name"],
             "question_topic": state["question_topic"],
@@ -130,15 +144,17 @@ class MultipleChoiceQuestionGeneratorAgent:
         }
         corrected_question = self._question_correction_chain.invoke(correction_input)
         state["corrected_question"] = corrected_question
+        logger.info("Node [question_correction] completed — corrected question generated")
         return state
         
     def _build_graph(self) -> CompiledStateGraph:
+        logger.debug("Building agent graph")
         graph = StateGraph(QuestionCreationState)
-        
+
         graph.add_node("question_generation", self._create_question_node)
         graph.add_node("question_evaluation", self._evaluate_question_node)
         graph.add_node("question_correction", self._correct_question_node)
-        
+
         graph.add_edge("question_generation", "question_evaluation")
         graph.add_conditional_edges(
             "question_evaluation",
@@ -146,16 +162,20 @@ class MultipleChoiceQuestionGeneratorAgent:
         )
         graph.add_edge("question_evaluation", "question_correction")
         graph.add_edge("question_correction", "question_evaluation")
-        
+
         graph.set_entry_point("question_generation")
-        
+
         app = graph.compile()
-                
+        logger.debug("Agent graph compiled successfully")
         return app
     
     def get_graph(self) -> CompiledStateGraph:
         return self._graph
 
     def invoke(self, question_input: dict) -> MultipleChoiceQuestion:
+        logger.info("Agent invoked — topic: '%s', level: '%s'", question_input.get("question_topic"), question_input.get("level"))
         full_input = self._build_input(**question_input)
-        return self._question_generation_chain.invoke(full_input)
+        result = self._graph.invoke(full_input)
+        final_question = result.get("corrected_question") or result.get("generated_question")
+        logger.info("Agent finished — returning %s", "corrected_question" if result.get("corrected_question") else "generated_question")
+        return final_question
