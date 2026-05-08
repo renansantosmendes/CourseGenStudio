@@ -25,6 +25,7 @@ from question_generator_agent.models import (
 
 from question_generator_agent.state import QuestionCreationState
 
+from langchain.globals import set_verbose
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -59,6 +60,7 @@ class MultipleChoiceQuestionGeneratorAgent:
         self.verbose = verbose
         self.subject_content = subject_content
         self.subject_name = subject_name
+        set_verbose(verbose)
 
         self._question_generation_chain = self._build_structured_chain(
             prompt=self.question_generation_prompt,
@@ -88,7 +90,7 @@ class MultipleChoiceQuestionGeneratorAgent:
             llm = ChatOpenAI(
                 model=model,
                 api_key=os.environ.get("OPENAI_API_KEY"),
-                temperature=0,
+                # temperature=0,
             ).with_structured_output(output_class)
     
             prompt = ChatPromptTemplate.from_template(prompt)
@@ -110,6 +112,7 @@ class MultipleChoiceQuestionGeneratorAgent:
             question_topic=state["question_topic"],
             level=state["level"]
         )
+        logger.info("Node [question_generation] — question input built, invoking generation chain")
         generated_question = self._question_generation_chain.invoke(question_input)
         state["generated_question"] = generated_question
         logger.info("Node [question_generation] completed — question generated successfully")
@@ -117,6 +120,7 @@ class MultipleChoiceQuestionGeneratorAgent:
 
     def _evaluate_question_node(self, state: QuestionCreationState) -> QuestionCreationState:
         logger.info("Node [question_evaluation] started")
+        logger.info("Node [question_evaluation] — invoking evaluation chain")
         evaluation_input = {
             "generated_question": state["generated_question"],
             "subject_content": state["subject_content"],
